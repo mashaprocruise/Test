@@ -1,0 +1,464 @@
+<title>Круизный сканер турагента</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;800;900&display=swap">
+<style>
+/* Layout: one narrow column like a phone screen; one question per screen.
+   Result = sea-filled radar (6 blocks) + per-block wave tracks + shoal card + steps + product */
+:root{
+  --bg:#0b1630;
+  --surface:#13234a;
+  --surface-2:#1a2d5c;
+  --chart:#0f2147;
+  --line:#2a3f73;
+  --fg:#f4f1ea;
+  --muted:#a9b3cc;
+  --gold:#e9b949;
+  --gold-soft:rgba(233,185,73,.14);
+  --wine:#e0687a;
+  --wine-deep:#8e2c3f;
+  --sea:#5fc9a8;
+  --font:"Onest",-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:520px;margin:0 auto;padding-block:28px 56px}
+h1,h2,h3{text-wrap:balance;margin:0}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800}
+.muted{color:var(--muted)}
+.demo{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:10px;padding:8px 12px}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:16px 20px;font-size:17px;font-weight:800;background:var(--gold);color:#1a1405;text-align:center;text-decoration:none}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.stack{display:flex;flex-direction:column;gap:16px}
+
+/* start */
+.hero h1{font-size:clamp(30px,8vw,40px);font-weight:900;line-height:1.05;text-transform:uppercase;letter-spacing:-.01em}
+.hero h1 span{color:var(--gold)}
+.meta{display:flex;gap:10px;flex-wrap:wrap}
+.meta div{flex:1 1 90px;background:var(--surface);border-radius:12px;padding:12px;text-align:center}
+.meta b{display:block;font-size:24px;font-weight:900;color:var(--gold)}
+.meta small{color:var(--muted);font-size:13px}
+.itin{background:var(--surface);border-radius:16px;padding:18px 18px 8px}
+.itin ul{list-style:none;margin:14px 0 0;padding:0;position:relative}
+.itin ul::before{content:"";position:absolute;left:13px;top:10px;bottom:22px;border-left:2px dashed var(--line)}
+.itin li{position:relative;display:flex;gap:14px;align-items:flex-start;padding-bottom:14px}
+.dot{flex:0 0 28px;height:28px;border-radius:50%;background:var(--surface-2);border:2px solid var(--gold);color:var(--gold);font-weight:800;font-size:13px;display:grid;place-items:center;position:relative;z-index:1}
+.dot.end{background:var(--gold);color:#1a1405;border-color:var(--gold)}
+.itin b{display:block;font-weight:700;line-height:1.3}
+.itin small{color:var(--muted);font-size:13px}
+.rule{font-size:14px;color:var(--muted);border-left:3px solid var(--wine-deep);padding-left:12px;margin:0}
+.author{font-size:13px;color:var(--muted);margin:0}
+
+/* quiz */
+.progress{height:6px;background:var(--surface);border-radius:6px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--gold);transition:width .25s}
+.qhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13px;color:var(--muted)}
+.qlink{color:var(--gold);font-weight:700}
+.q{font-size:clamp(21px,5.5vw,25px);font-weight:800;line-height:1.25}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{text-align:left;background:var(--surface);color:var(--fg);border:1.5px solid transparent;border-radius:14px;padding:15px 16px;font-size:16px;line-height:1.35}
+.opt:hover{border-color:var(--line)}
+.opt.sel{border-color:var(--gold);background:var(--surface-2)}
+.back{background:none;border:0;color:var(--muted);font-size:15px;padding:6px 0;align-self:flex-start}
+
+/* contact */
+label{font-weight:600;font-size:15px;display:block;margin-bottom:6px}
+input[type=text]{width:100%;font:inherit;color:var(--fg);background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:14px}
+.check{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--muted);padding:4px 0;cursor:pointer}
+.check a{color:var(--gold)}
+.check input{margin-top:1px;flex:0 0 22px;width:22px;height:22px;accent-color:var(--gold)}
+
+/* result */
+.res-title{text-align:center}
+.res-title h1{font-size:clamp(28px,7.5vw,36px);font-weight:900;text-transform:uppercase;margin-top:6px}
+.mapcard{background:var(--chart);border:1px solid var(--line);border-radius:18px;padding:10px 10px 14px;overflow:hidden}
+.map{width:100%;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;font-size:13px;color:var(--muted);margin-top:6px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:var(--c)}
+.avg{text-align:center;font-size:14px;color:var(--muted);margin-top:8px}
+.avg b{color:var(--gold);font-size:18px;font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border-radius:18px;padding:20px}
+.main{border:1.5px solid var(--wine);background:linear-gradient(180deg,rgba(224,104,122,.12),transparent 70%)}
+.main.ok{border-color:var(--sea);background:linear-gradient(180deg,rgba(95,201,168,.12),transparent 70%)}
+.main .eyebrow{color:var(--wine)} .main.ok .eyebrow{color:var(--sea)}
+.main h2{font-size:28px;font-weight:900;text-transform:uppercase;margin:8px 0 10px;line-height:1.1}
+.main .lnk{font-size:14px;color:var(--muted)}
+.ports{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.port-top{display:flex;align-items:baseline;gap:10px}
+.port-top .nm{font-weight:700;flex:1;min-width:0}
+.port-top .nm small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.port-top .st{font-size:13px;white-space:nowrap}
+.port-top .sc{font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums;min-width:30px;text-align:right}
+.track{width:100%;display:block;margin-top:2px}
+.st-strong{color:var(--sea)} .st-work{color:var(--gold)} .st-weak{color:var(--wine)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;counter-reset:s}
+.steps li{counter-increment:s;background:var(--surface);border-radius:14px;padding:16px 16px 16px 60px;position:relative}
+.steps li::before{content:counter(s);position:absolute;left:16px;top:14px;width:30px;height:30px;border-radius:50%;background:var(--gold);color:#1a1405;font-weight:900;display:grid;place-items:center}
+.product{background:var(--wine-deep);border-radius:18px;padding:22px}
+.product h3{font-size:22px;font-weight:900;margin:6px 0 10px}
+.product .eyebrow{color:#ffd9de}
+.product p{margin:0 0 16px}
+.foot{font-size:13px;color:var(--muted);text-align:center;margin:0}
+.shoal-ring{transform-box:fill-box;transform-origin:center;animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.9}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap" id="app"></div>
+
+<script>
+const PORTS = [
+  {id:'opora',  name:'Уверенность',          hint:'сама веришь в круиз и не боишься вопросов'},
+  {id:'product',name:'Знание продукта',      hint:'компании, лайнеры, каюты'},
+  {id:'build',  name:'Сборка тура',          hint:'расчёт, перелёт, визы, бронирование'},
+  {id:'action', name:'Действие',             hint:'делаешь, а не готовишься бесконечно'},
+  {id:'flow',   name:'Поток запросов',       hint:'тебя видят и к тебе приходят'},
+  {id:'sale',   name:'Доведение до брони',   hint:'«дорого», «подумаем» и следующий шаг'}
+];
+
+const QUESTIONS = [
+  {l:'opora', q:'Ты сама была в морском круизе?', o:[
+    ['Да, и не один раз',3],['Один раз или только на речном',2],['Нет, но очень хочу',1],['Нет, и сама побаиваюсь воды и качки',0]]},
+  {l:'opora', q:'Ты выкладываешь сторис про круиз. О чём думаешь в этот момент?', o:[
+    ['Жду вопросов, мне есть что ответить',3],['Немного волнуюсь, но разберусь, если спросят',2],['Надеюсь, что никто не спросит подробности',0],['Я пока не выкладываю про круизы',1]]},
+  {l:'opora', q:'Турист пишет: «Боюсь, что укачает, и вокруг одна вода». Что ты чувствуешь?', o:[
+    ['Понимаю его, но уверенно ответить не смогу',1],['Знаю, как подобрать лайнер и каюту под этот страх',3],['У меня такой же страх',0],['Отвечу, что лайнеры огромные и качку не почувствуешь',1]]},
+
+  {l:'product', q:'Пара пишет: «Мы ни разу не были в круизе, что посоветуете?» Сколько компаний ты назовёшь сразу, без поиска?', o:[
+    ['Три и больше, и скажу, кому какая подходит',3],['Одну или две',2],['Назову, но не объясню, чем они отличаются',1],['Пойду искать у туроператора или в интернете',0]]},
+  {l:'product', q:'Как ты выбираешь туристу каюту?', o:[
+    ['Объясняю разницу категорий и подбираю под привычки туриста',3],['Внутренняя, с окном, с балконом, дальше по бюджету',2],['Беру ту, что дешевле или что предложил туроператор',1],['Пока не сталкивалась',0]]},
+  {l:'product', q:'Откуда ты сейчас берёшь информацию о круизах?', o:[
+    ['У меня свои шпаргалки по каждой компании',3],['Сайты компаний и материалы туроператоров',2],['Проходила обучение, но многое забылось',1],['Пока ниоткуда, тема для меня новая',0]]},
+
+  {l:'build', q:'Ты делала круизный расчёт целиком: перелёт до порта, ночь перед посадкой, каюта, депозит, допы?', o:[
+    ['Да, и не раз',3],['Один раз, долго и со страхом ошибиться',2],['Считала только стоимость каюты',1],['Нет',0]]},
+  {l:'build', q:'Туристу нравится маршрут через визовую страну. Твои действия?', o:[
+    ['Предлагаю, визу помогут оформить проверенные партнёры',3],['Предлагаю, но сама переживаю за визу до самого вылета',1],['Сразу ищу безвизовый вариант, чтобы не связываться',1],['Скорее откажусь от такого запроса',0]]},
+  {l:'build', q:'Турист спрашивает: «А что входит в стоимость? Напитки, чаевые, экскурсии?»', o:[
+    ['Отвечаю сразу, по конкретной компании',3],['Отвечаю в общем, детали уточняю у туроператора',2],['Придётся долго искать',1],['Этого вопроса я боюсь больше всего',0]]},
+
+  {l:'action', q:'Сколько обучений (курсы, марафоны, интенсивы) ты прошла за последний год?', o:[
+    ['Пару, и всё узнанное уже применяю',3],['Несколько, применяю часть',2],['Много, но до дела доходит мало',1],['Много, и уже присматриваю следующее: без него пока не начну',0]]},
+  {l:'action', q:'Ты выложила рилс про круиз, а он не набрал просмотров. Что дальше?', o:[
+    ['Выкладываю следующий по плану',3],['Расстраиваюсь, но через пару дней снимаю новый',2],['Ищу курс или стратегию, чтобы сначала научиться делать правильно',0],['Бросаю на время, раз не работает',1]]},
+  {l:'action', q:'Что ты сделала для продажи круизов за последнюю неделю?', o:[
+    ['Пост или сторис и несколько сообщений туристам',3],['Что-то одно из этого',2],['Изучала материалы, продумывала стратегию',0],['Ничего, не было времени',1]]},
+
+  {l:'flow', q:'Сколько запросов на круиз пришло к тебе за последние 3 месяца?', o:[
+    ['Пять и больше',3],['Два-четыре',2],['Один',1],['Ни одного',0]]},
+  {l:'flow', q:'Как часто в твоих соцсетях появляется что-то про круизы?', o:[
+    ['Каждую неделю, по плану',3],['Пару раз в месяц',2],['Когда есть вдохновение или горящее предложение',1],['Почти никогда или соцсети не веду',0]]},
+  {l:'flow', q:'Когда ты последний раз сама предлагала круиз туристу из своей базы?', o:[
+    ['В этом месяце',3],['За последние полгода',2],['Давно, уже не помню',1],['Ни разу',0]]},
+
+  {l:'sale', q:'Турист узнал цену и сказал «дорого». Что обычно происходит дальше?', o:[
+    ['Объясняю, что входит в цену, и чаще всего договариваемся',3],['Объясняю, но турист всё равно уходит',1],['Предлагаю подешевле или соглашаюсь, что дорого',1],['До цены у меня пока не доходило',0]]},
+  {l:'sale', q:'Турист сказал «подумаем». Что ты делаешь?', o:[
+    ['Договариваюсь о дате, когда вернёмся к разговору, и пишу в этот день',3],['Пишу через неделю-две: «Ну что, надумали?»',1],['Жду, пока сам напишет',0],['Пишу несколько раз, пока не ответит',1]]},
+  {l:'sale', q:'Сколько твоих круизных запросов за всё время дошло до брони?', o:[
+    ['Больше половины',3],['Примерно каждый третий',2],['Единицы',1],['Пока ни одного или запросов не было',0]]}
+];
+
+const RESULTS = {
+  opora:{title:'Стоишь у трапа',
+    text:'Знания и желание есть, но внутри сидит свой страх: воды, качки или вопроса, на который не найдёшь ответ. Пока он с тобой, круиз ты предлагаешь вполголоса, и турист это чувствует.',
+    steps:['Выпиши свой главный страх про круиз. Скорее всего, это тот же страх, что у твоих туристов, и ответ на него станет твоим первым постом.',
+      'Разбери один лайнер до мелочей: какие каюты меньше чувствуют качку, что есть на борту, как проходит день. Страх про конкретный корабль превращается в вопрос с ответом.',
+      'Смотри круиз глазами тех, кто там был: обзоры кают, прогулки по палубам, видео из порта. Реклама страх не снимает, живые детали снимают.'],
+    product:'nb'},
+  product:{title:'Плывёшь без карты',
+    text:'Запрос приходит, а в голове туман: какие компании, чем отличаются, какую каюту брать. Приходится искать на ходу, и пока ищешь, турист остывает.',
+    steps:['Выбери одну круизную компанию и изучи её до конца: кому подходит, маршруты, что входит в цену, условия бронирования.',
+      'Собери шпаргалку на одну страницу и держи её под рукой во время диалога.',
+      'Разберись в категориях кают на одном лайнере, чтобы уверенно объяснять разницу и не отдавать выбор туроператору.'],
+    product:'ind'},
+  build:{title:'Маршрут не собирается',
+    text:'Каюту найти не страшно. Страшно всё вокруг неё: перелёт до порта, ночь перед посадкой, визы, депозит, допы. Кажется, что ошибёшься в одной детали, и всё развалится.',
+    steps:['Сделай один учебный расчёт для себя от начала до конца: перелёт, отель перед посадкой, каюта, допы. Без туриста и без спешки.',
+      'Найди проверенного партнёра по визам. Ты не визовый специалист, ты связующее звено между туристом и тем, кто делает визы.',
+      'Запиши по шагам, как бронируется круиз у одного туроператора. Во второй раз уйдёт вдвое меньше времени.'],
+    product:'ind'},
+  action:{title:'Чертишь карты на берегу',
+    text:'Знаний уже хватает, но вместо действий снова новое обучение, новая стратегия, новый инструмент. Рилс не набрал просмотров, и ты уходишь искать, как сделать правильно. Продажи появляются от регулярных действий, а их пока мало.',
+    steps:['Поставь обучения на паузу на месяц. Всё, что нужно для первой брони, у тебя уже есть.',
+      'Выбери одно действие на каждый день: пост, сторис или три сообщения туристам из базы. Делай его, даже если кажется, что получилось неидеально.',
+      'Подводи итоги через месяц. Один ролик без просмотров ещё ничего не говорит о том, работает твоя стратегия или нет.'],
+    product:'retake'},
+  flow:{title:'Стоишь в порту',
+    text:'Запросов почти нет. Чаще всего причина простая: подписчики пока не знают, что ты продаёшь круизы, и не понимают, зачем им это.',
+    steps:['Расскажи свою историю про круиз: свой круиз, мечту или страх. С личной истории людям проще начать с тобой разговор.',
+      'Напиши десяти туристам из своей базы короткое сообщение с одним вопросом: «Вы когда-нибудь думали о круизе?»',
+      'Закрепи в хайлайтах обзор одного лайнера, чтобы новому подписчику было что посмотреть про круизы.'],
+    product:'nb'},
+  sale:{title:'Турист сошёл на берег',
+    text:'Запросы есть, а до брони доходят единицы. Диалог обрывается на «дорого» или «подумаем», и непонятно, в какой момент ты потеряла туриста.',
+    steps:['В каждом диалоге договаривайся о дате следующего шага: «Давайте я вернусь к вам в четверг?» И пиши именно в этот день.',
+      'Давай туристу три варианта. Выбирать из трёх проще, чем отвечать «да» или «нет» на один.',
+      'Перечитай три последних диалога, которые не дошли до брони, и найди сообщение, после которого турист замолчал.'],
+    product:'ind'},
+  full:{title:'Полный вперёд',
+    text:'Мелей на маршруте нет. Ты знаешь продукт, тебя видят и ты доводишь туристов до брони. Дальше вопрос масштаба: больше запросов при том же времени.',
+    steps:['Посчитай, сколько часов в неделю уходит на круизный контент, и реши, что из этого можно отдать.',
+      'Собери отзывы туристов после круиза и закрепи их в профиле.',
+      'Возьми в работу одну новую компанию, которую ещё не продавала.'],
+    product:'nb'}
+};
+
+const DEMO = true; // в боевой версии false
+const YANDEX_FORM_URL = ''; // ссылка на Яндекс Форму (имя, Telegram, согласия)
+const CHANNEL_URL = 'https://t.me/masha_pro_cruise'; // ссылка на открытый канал для турагентов
+
+const PRODUCTS = {
+  nb:{eyebrow:'Чтобы не идти этим курсом в одиночку', title:'Клуб НА БОРТУ',
+    text:'Готовый контент про круизы, который ты публикуешь от своего имени: посты с ответами на страхи туристов, рилс, обзоры лайнеров для хайлайтов. Сейчас вход закрыт, можно встать в лист ожидания.',
+    cta:'Встать в лист ожидания', href:'https://t.me/masha_pro_cruise'},
+  ind:{eyebrow:'Если хочешь сняться с мели на своих запросах', title:'Индивидуальное сопровождение',
+    text:'Месяц работы вдвоём: лайнеры, каюты и условия бронирования по каждой компании, разбор твоих реальных диалогов с туристами. Цель месяца: минимум пять круизных запросов.',
+    cta:'Написать Маше', href:'https://t.me/masha_pro_cruise'},
+  retake:{eyebrow:'Без новых обучений', title:'Вызов на 30 дней',
+    text:'Каждый день одно действие для продажи круизов: пост, сторис или три сообщения туристам из базы. Через 30 дней пройди этот тест ещё раз и сравни, как изменилась твоя диаграмма. А пока читай мой открытый канал для турагентов: там разборы и идеи, которые можно сразу брать в работу.',
+    cta:'Открыть канал для турагентов', href:CHANNEL_URL}
+};
+
+const SHEET_URL = ''; // сюда встанет адрес Google Таблицы
+const CONSENT_PD = 'https://honcf.tb.ru/agreement';  // ссылка на согласие на обработку ПД
+const CONSENT_ADS = 'https://honcf.tb.ru/rassilka'; // ссылка на согласие на рассылку
+
+const app = document.getElementById('app');
+let answers = new Array(QUESTIONS.length).fill(null);
+let idx = 0;
+const portOf = id => PORTS.find(p=>p.id===id);
+const portNo = id => PORTS.findIndex(p=>p.id===id)+1;
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- start ---------- */
+function start(){
+  app.innerHTML = `
+  <div class="stack hero">
+    <div class="demo">Демо-версия: тексты черновые, сводка в таблицу пока не подключена.</div>
+    <div class="eyebrow">Тест для турагентов</div>
+    <h1>Что мешает тебе <span>продавать круизы</span></h1>
+    <p class="muted" style="margin:0">Ответь на 18 вопросов и сразу увидишь, что именно тормозит твои продажи круизов и с чего начать.</p>
+    <div class="meta"><div><b>6</b><small>блоков</small></div><div><b>18</b><small>вопросов</small></div><div><b>~6</b><small>минут</small></div></div>
+    <div class="itin"><div class="eyebrow">Что проверим</div>
+      <ul>
+        ${PORTS.map((p,i)=>`<li><span class="dot">${i+1}</span><div><b>${p.name}</b><small>${p.hint}</small></div></li>`).join('')}
+      </ul></div>
+    <p class="rule">Продажи упираются в первую проблему по порядку. Пока нет запросов, отрабатывать «дорого» не на ком.</p>
+    <button class="btn" id="go">Начать тест</button>
+    <p class="author">Маша Про Круиз · 5 лет в экипаже Oceania, MSC и Ponant</p>
+  </div>`;
+  document.getElementById('go').onclick = ()=>{ idx=0; question(); };
+}
+
+/* ---------- quiz ---------- */
+function question(){
+  const Q = QUESTIONS[idx], P = portOf(Q.l);
+  const pct = Math.round(idx/QUESTIONS.length*100);
+  app.innerHTML = `
+  <div class="stack">
+    <div class="progress"><i style="width:${pct}%"></i></div>
+    <div class="qhead"><span class="qlink">Блок ${portNo(Q.l)} · ${P.name}</span><span>${idx+1} из ${QUESTIONS.length}</span></div>
+    <h2 class="q">${esc(Q.q)}</h2>
+    <div class="opts">${Q.o.map((o,i)=>`<button class="opt${answers[idx]===i?' sel':''}" data-i="${i}">${esc(o[0])}</button>`).join('')}</div>
+    ${idx>0?'<button class="back" id="back">← Назад</button>':''}
+  </div>`;
+  app.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    answers[idx]=+b.dataset.i;
+    b.classList.add('sel');
+    setTimeout(()=>{ idx++; idx<QUESTIONS.length?question():(YANDEX_FORM_URL?lastStep():contact()); },180);
+  });
+  const bk=document.getElementById('back'); if(bk) bk.onclick=()=>{idx--;question();};
+  window.scrollTo(0,0);
+}
+
+function attemptNo(){ let n=1; try{ n=(+localStorage.getItem('cs_attempts')||0)+1; }catch(e){} return n; }
+
+function lastStep(){
+  const r=score(), n=attemptNo();
+  try{ sessionStorage.setItem('cs_pending',JSON.stringify({...r,a:answers})); }catch(e){}
+  const scores=PORTS.map(p=>`${p.name} ${r.s[p.id].toFixed(1)}`).join(' · ');
+  const q=new URLSearchParams({result:RESULTS[r.main].title, scores, answers:answers.join(''), attempt:String(n),
+    src:new URLSearchParams(location.search).get('src')||''});
+  const href=YANDEX_FORM_URL+(YANDEX_FORM_URL.includes('?')?'&':'?')+q.toString();
+  app.innerHTML = `
+  <div class="stack">
+    <div class="progress"><i style="width:100%"></i></div>
+    <div class="eyebrow">Последний шаг</div>
+    <h2 class="q">Оставь имя и Telegram, и сразу увидишь свой результат</h2>
+    <p class="muted" style="margin:0">Откроется короткая форма из двух полей. После отправки ты вернёшься сюда, к своему результату.</p>
+    <a class="btn" id="toForm" href="${href}">Перейти к форме</a>
+    <button class="back" id="back">← Назад</button>
+  </div>`;
+  document.getElementById('toForm').onclick=()=>{ try{ localStorage.setItem('cs_attempts',n);}catch(e){} };
+  document.getElementById('back').onclick=()=>{idx=QUESTIONS.length-1;question();};
+  window.scrollTo(0,0);
+}
+
+function contact(){
+  app.innerHTML = `
+  <div class="stack">
+    <div class="progress"><i style="width:100%"></i></div>
+    <div class="eyebrow">Последний шаг</div>
+    <h2 class="q">Как тебя зовут?</h2>
+    <p class="muted" style="margin:0">Результат откроется сразу на этой странице.</p>
+    <div><label for="nm">Имя</label><input type="text" id="nm" autocomplete="given-name"></div>
+    <div><label for="tg">Ник в Telegram</label><input type="text" id="tg" placeholder="@username"></div>
+    <label class="check"><input type="checkbox" id="ok"> <span>Даю <a href="${CONSENT_PD}" target="_blank" rel="noopener">согласие на обработку персональных данных</a> (обязательно)</span></label>
+    <label class="check"><input type="checkbox" id="ads"> <span>Даю <a href="${CONSENT_ADS}" target="_blank" rel="noopener">согласие на получение рассылки</a> с полезными материалами и предложениями</span></label>
+    <button class="btn" id="show" disabled>Показать мой результат</button>
+    <button class="back" id="back">← Назад</button>
+  </div>`;
+  const nm=document.getElementById('nm'), ok=document.getElementById('ok'), btn=document.getElementById('show');
+  const upd=()=>btn.disabled=!(nm.value.trim()&&ok.checked);
+  nm.oninput=upd; ok.onchange=upd;
+  document.getElementById('back').onclick=()=>{idx=QUESTIONS.length-1;question();};
+  btn.onclick=()=>{ const r=score(); save(nm.value.trim(),document.getElementById('tg').value.trim(),r,document.getElementById('ads').checked); try{ sessionStorage.setItem('cs_result',JSON.stringify(r)); }catch(e){} result(r); };
+}
+
+/* ---------- scoring ---------- */
+function score(){
+  const sums={}, max={};
+  PORTS.forEach(p=>{sums[p.id]=0;max[p.id]=0;});
+  QUESTIONS.forEach((Q,i)=>{ sums[Q.l]+=Q.o[answers[i]][1]; max[Q.l]+=3; });
+  const s={}; PORTS.forEach(p=>s[p.id]=Math.round(sums[p.id]/max[p.id]*100)/10);
+  const firstShoal = PORTS.find(p=>s[p.id]<5);
+  let main;
+  if(firstShoal) main=firstShoal.id;
+  else { const lowest=[...PORTS].sort((a,b)=>s[a.id]-s[b.id])[0]; main = s[lowest.id]>=7 ? 'full' : lowest.id; }
+  const avg = Math.round(PORTS.reduce((t,p)=>t+s[p.id],0)/PORTS.length*10)/10;
+  return {s,main,avg};
+}
+const status = v => v>=7?['Чистая вода','st-strong','var(--sea)']:v>=5?['Лёгкая качка','st-work','var(--gold)']:['Мель','st-weak','var(--wine)'];
+
+/* ---------- drawing helpers ---------- */
+function ship(x,y,sc=1){
+  return `<g transform="translate(${x},${y}) scale(${sc})">
+    <path d="M-17,-5 L17,-5 L12,3 L-12,3 Z" fill="var(--fg)"/>
+    <rect x="-17" y="-5" width="34" height="2" fill="var(--wine-deep)"/>
+    <rect x="-11" y="-10" width="18" height="5" rx="1" fill="var(--fg)"/>
+    <rect x="-7" y="-14" width="11" height="4" rx="1" fill="var(--fg)"/>
+    <rect x="2" y="-19" width="4" height="6" fill="var(--gold)"/>
+  </g>`;
+}
+function seaRadar(r){
+  const W=440,H=336,cx=220,cy=160,R=112,n=PORTS.length;
+  const SHORT=['Уверенность','Продукт','Сборка тура','Действие','Запросы','Продажа'];
+  const pt=(i,rad)=>{const a=-Math.PI/2+i*2*Math.PI/n;return [cx+rad*Math.cos(a),cy+rad*Math.sin(a)];};
+  const ring=f=>PORTS.map((_,i)=>pt(i,R*f).map(v=>v.toFixed(1)).join(',')).join(' ');
+  let g=`<defs>
+    <linearGradient id="seaG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fc9a8" stop-opacity=".55"/><stop offset="1" stop-color="#2a74c9" stop-opacity=".65"/></linearGradient>
+    <pattern id="waves" width="22" height="12" patternUnits="userSpaceOnUse"><path d="M0,7 q5.5,-5 11,0 t11,0" fill="none" stroke="#ffffff" stroke-opacity=".3" stroke-width="1.3"/></pattern>
+  </defs>`;
+  [0.25,0.5,0.75].forEach(f=>{g+=`<polygon points="${ring(f)}" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5"/>`;});
+  g+=`<polygon points="${ring(1)}" fill="none" stroke="var(--line)" stroke-width="1.5"/>`;
+  PORTS.forEach((_,i)=>{const [x,y]=pt(i,R);g+=`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;});
+  const P=(p,i)=>pt(i,R*Math.max(r.s[p.id],.4)/10);
+  const poly=PORTS.map((p,i)=>P(p,i).map(v=>v.toFixed(1)).join(',')).join(' ');
+  g+=`<polygon points="${poly}" fill="url(#seaG)"/><polygon points="${poly}" fill="url(#waves)" stroke="#7fd6ff" stroke-width="2.5" stroke-linejoin="round"/>`;
+  PORTS.forEach((p,i)=>{
+    const st=status(r.s[p.id]),[x,y]=P(p,i);
+    if(p.id===r.main) g+=`<circle class="shoal-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="none" stroke="var(--wine)" stroke-width="2" stroke-dasharray="3 3"/>`;
+    g+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="${st[2]}" stroke="var(--bg)" stroke-width="2"/>`;
+  });
+  PORTS.forEach((p,i)=>{
+    const v=r.s[p.id],st=status(v),[vx,vy]=pt(i,R);
+    let x,y,a;
+    if(Math.abs(vx-cx)<1){ if(vy<cy){x=vx;y=vy-30;}else{x=vx;y=vy+24;} a='middle'; }
+    else if(vx>cx){x=vx+12;y=vy-4;a='start';}
+    else {x=vx-12;y=vy-4;a='end';}
+    g+=`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${a}" fill="${st[2]}" font-size="17" font-weight="900" font-family="Onest,sans-serif">${v.toFixed(1)}</text>
+        <text x="${x.toFixed(1)}" y="${(y+16).toFixed(1)}" text-anchor="${a}" fill="var(--muted)" font-size="12.5" font-family="Onest,sans-serif">${SHORT[i]}</text>`;
+  });
+  return `<svg class="map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Баллы по шести блокам">${g}</svg>`;
+}
+
+function seaTrack(v,id){
+  const W=300,H=30,col=status(v)[2];
+  let d='';
+  for(let x=0;x<=W;x+=3){const y=16+3.2*Math.sin(x/9);d+=(x?'L':'M')+x+','+y.toFixed(1);}
+  const px=Math.max(18,Math.min(W-18,v*30)), py=16+3.2*Math.sin(px/9);
+  return `<svg class="track" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <defs><clipPath id="cp-${id}"><rect x="0" y="0" width="${v*30}" height="${H}"/></clipPath></defs>
+    <path d="${d}" fill="none" stroke="var(--line)" stroke-width="3" stroke-linecap="round"/>
+    <path d="${d}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round" clip-path="url(#cp-${id})"/>
+    ${ship(px,py-2,.62)}
+  </svg>`;
+}
+
+/* ---------- result ---------- */
+function result(r){
+  const R=RESULTS[r.main], P=PRODUCTS[R.product];
+  const shoal = r.main==='full'?null:portOf(r.main);
+  app.innerHTML = `
+  <div class="stack">
+    <div class="res-title"><div class="eyebrow">Результат теста</div><h1>Где твоя мель</h1></div>
+    <div class="mapcard">
+      ${seaRadar(r)}
+      <div class="legend"><span style="--c:var(--sea)">Чистая вода 7–10</span><span style="--c:var(--gold)">Лёгкая качка 5–7</span><span style="--c:var(--wine)">Мель ниже 5</span></div>
+      <div class="avg">Средний балл <b>${r.avg.toFixed(1)}</b> из 10</div>
+    </div>
+
+    <div class="card main${shoal?'':' ok'}">
+      <div class="eyebrow">${shoal?'Твоя мель':'Твой результат'}</div>
+      <h2>${R.title}</h2>
+      ${shoal?`<div class="lnk">Блок ${portNo(r.main)} · ${shoal.name} · ${r.s[r.main].toFixed(1)} из 10</div>`:''}
+      <p style="margin:12px 0 0">${R.text}</p>
+    </div>
+
+    <div class="card"><div class="eyebrow">Твой результат</div>
+      <div class="ports">${PORTS.map((p,k)=>{const v=r.s[p.id],st=status(v);return `
+        <div><div class="port-top"><span class="nm">${k+1}. ${p.name}<small>${p.hint}</small></span><span class="st ${st[1]}">${st[0]}</span><span class="sc">${v.toFixed(1)}</span></div>
+        ${seaTrack(v,p.id)}</div>`;}).join('')}
+      </div></div>
+
+    <div class="eyebrow" style="margin-top:8px">Твои первые шаги</div>
+    <ol class="steps">${R.steps.map(t=>`<li>${t}</li>`).join('')}</ol>
+
+    <div class="product">
+      <div class="eyebrow">${P.eyebrow}</div>
+      <h3>${P.title}</h3>
+      <p>${P.text}</p>
+      <a class="btn" href="${P.href}" target="_blank" rel="noopener">${P.cta}</a>
+    </div>
+
+    <p class="foot">Главная проблема определяется по порядку блоков: это первый блок с баллом ниже 5. Следующие блоки подождут, пока не решишь эту.</p>
+    ${DEMO?'<button class="back" id="demoReset" style="align-self:center">Демо: пройти заново</button>':''}
+  </div>`;
+  const dr=document.getElementById('demoReset');
+  if(dr) dr.onclick=()=>{ try{sessionStorage.removeItem('cs_result');sessionStorage.removeItem('cs_pending');}catch(e){} answers=new Array(QUESTIONS.length).fill(null); start(); window.scrollTo(0,0); };
+  window.scrollTo(0,0);
+}
+
+function save(name,tg,r,ads){
+  let n=1; try{ n=(+localStorage.getItem('cs_attempts')||0)+1; localStorage.setItem('cs_attempts',n);}catch(e){}
+  if(!SHEET_URL) return;
+  const row={name,tg,ads:ads?'да':'нет',attempt:n,result:RESULTS[r.main].title,avg:r.avg,...r.s,
+    answers:answers.join(''),src:new URLSearchParams(location.search).get('src')||''};
+  try{ fetch(SHEET_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(row)}); }catch(e){}
+}
+
+(function boot(){
+  const ok=o=>o && o.s && PORTS.every(p=>typeof o.s[p.id]==='number') && (o.main==='full'||PORTS.some(p=>p.id===o.main));
+  const get=k=>{ let v=null; try{ v=JSON.parse(sessionStorage.getItem(k)||'null'); }catch(e){} if(v && !ok(v)){ try{sessionStorage.removeItem(k);}catch(e){} v=null; } return v; };
+  let saved=get('cs_result'), pending=get('cs_pending');
+  const done=new URLSearchParams(location.search).get('done')==='1';
+  if(done && pending && pending.s){
+    try{ sessionStorage.setItem('cs_result',JSON.stringify(pending)); sessionStorage.removeItem('cs_pending'); }catch(e){}
+    saved=pending;
+  }
+  if(saved && saved.s && RESULTS[saved.main]){ try{ result(saved); }catch(e){ try{sessionStorage.removeItem('cs_result');}catch(_){} start(); } }
+  else if(pending && pending.s && YANDEX_FORM_URL){ answers=pending.a||[]; idx=QUESTIONS.length; lastStepFrom(pending); }
+  else start();
+})();
+function lastStepFrom(r){ // вернулась с формы без отправки: снова показываем последний шаг
+  const saveScore=score; score=()=>r; lastStep(); score=saveScore;
+}
+</script>
