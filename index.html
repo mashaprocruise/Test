@@ -211,17 +211,18 @@ const RESULTS = {
     product:'nb'}
 };
 
-const DEMO = true; // в боевой версии false
-const YANDEX_FORM_URL = ''; // ссылка на Яндекс Форму (имя, Telegram, согласия)
-const CHANNEL_URL = 'https://t.me/masha_pro_cruise'; // ссылка на открытый канал для турагентов
+const DEMO = false;
+const YANDEX_FORM_URL = 'https://forms.yandex.ru/u/6ad3ddae1f1eb56ed20001b3/'; // ссылка на Яндекс Форму (имя, Telegram, согласия)
+const WAITLIST_FORM_URL = 'https://forms.yandex.ru/u/6ad3e37cc45c07a1493c7c52/'; // лист ожидания НА БОРТУ
+const CHANNEL_URL = 'https://t.me/pro_cruise_start'; // ссылка на открытый канал для турагентов
 
 const PRODUCTS = {
   nb:{eyebrow:'Чтобы не идти этим курсом в одиночку', title:'Клуб НА БОРТУ',
     text:'Готовый контент про круизы, который ты публикуешь от своего имени: посты с ответами на страхи туристов, рилс, обзоры лайнеров для хайлайтов. Сейчас вход закрыт, можно встать в лист ожидания.',
-    cta:'Встать в лист ожидания', href:'https://t.me/masha_pro_cruise'},
+    cta:'Встать в лист ожидания', href:'#waitlist'},
   ind:{eyebrow:'Если хочешь сняться с мели на своих запросах', title:'Индивидуальное сопровождение',
     text:'Месяц работы вдвоём: лайнеры, каюты и условия бронирования по каждой компании, разбор твоих реальных диалогов с туристами. Цель месяца: минимум пять круизных запросов.',
-    cta:'Написать Маше', href:'https://t.me/masha_pro_cruise'},
+    cta:'Написать Маше', href:'https://t.me/m/r4ceJ8DGMDc6'},
   retake:{eyebrow:'Без новых обучений', title:'Вызов на 30 дней',
     text:'Каждый день одно действие для продажи круизов: пост, сторис или три сообщения туристам из базы. Через 30 дней пройди этот тест ещё раз и сравни, как изменилась твоя диаграмма. А пока читай мой открытый канал для турагентов: там разборы и идеи, которые можно сразу брать в работу.',
     cta:'Открыть канал для турагентов', href:CHANNEL_URL}
@@ -242,7 +243,6 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 function start(){
   app.innerHTML = `
   <div class="stack hero">
-    <div class="demo">Демо-версия: тексты черновые, сводка в таблицу пока не подключена.</div>
     <div class="eyebrow">Тест для турагентов</div>
     <h1>Что мешает тебе <span>продавать круизы</span></h1>
     <p class="muted" style="margin:0">Ответь на 18 вопросов и сразу увидишь, что именно тормозит твои продажи круизов и с чего начать.</p>
@@ -320,7 +320,7 @@ function contact(){
   const upd=()=>btn.disabled=!(nm.value.trim()&&ok.checked);
   nm.oninput=upd; ok.onchange=upd;
   document.getElementById('back').onclick=()=>{idx=QUESTIONS.length-1;question();};
-  btn.onclick=()=>{ const r=score(); save(nm.value.trim(),document.getElementById('tg').value.trim(),r,document.getElementById('ads').checked); try{ sessionStorage.setItem('cs_result',JSON.stringify(r)); }catch(e){} result(r); };
+  btn.onclick=()=>{ const r=score(); save(nm.value.trim(),document.getElementById('tg').value.trim(),r,document.getElementById('ads').checked); r.a=answers.slice(); try{ sessionStorage.setItem('cs_result',JSON.stringify(r)); }catch(e){} result(r); };
 }
 
 /* ---------- scoring ---------- */
@@ -394,8 +394,21 @@ function seaTrack(v,id){
 }
 
 /* ---------- result ---------- */
+function waitlistHref(r){
+  let n=1; try{ n=+localStorage.getItem('cs_attempts')||1; }catch(e){}
+  const q=new URLSearchParams({result:RESULTS[r.main].title,
+    scores:PORTS.map(p=>`${p.name} ${r.s[p.id].toFixed(1)}`).join(' · '),
+    answers:(r.a||[]).join(''), attempt:String(n), src:new URLSearchParams(location.search).get('src')||''});
+  return WAITLIST_FORM_URL+'?'+q.toString();
+}
+const WAITLIST_DONE={eyebrow:'Готово', title:'Ты в листе ожидания',
+  text:'Узнаешь первой, когда я снова открою вход в канал НА БОРТУ. А пока переходи в мой основной канал для турагентов.',
+  cta:'Перейти в канал для турагентов', href:CHANNEL_URL};
 function result(r){
-  const R=RESULTS[r.main], P=PRODUCTS[R.product];
+  const R=RESULTS[r.main];
+  let waited=false; try{ waited=sessionStorage.getItem('cs_waitlist')==='1'; }catch(e){}
+  let P=PRODUCTS[R.product];
+  if(R.product==='nb') P = waited ? WAITLIST_DONE : {...P, href:waitlistHref(r)};
   const shoal = r.main==='full'?null:portOf(r.main);
   app.innerHTML = `
   <div class="stack">
@@ -426,14 +439,14 @@ function result(r){
       <div class="eyebrow">${P.eyebrow}</div>
       <h3>${P.title}</h3>
       <p>${P.text}</p>
-      <a class="btn" href="${P.href}" target="_blank" rel="noopener">${P.cta}</a>
+      <a class="btn" href="${P.href}"${P.href.startsWith('https://t.me')?' target="_blank" rel="noopener"':''}>${P.cta}</a>
     </div>
 
     <p class="foot">Главная проблема определяется по порядку блоков: это первый блок с баллом ниже 5. Следующие блоки подождут, пока не решишь эту.</p>
     ${DEMO?'<button class="back" id="demoReset" style="align-self:center">Демо: пройти заново</button>':''}
   </div>`;
   const dr=document.getElementById('demoReset');
-  if(dr) dr.onclick=()=>{ try{sessionStorage.removeItem('cs_result');sessionStorage.removeItem('cs_pending');}catch(e){} answers=new Array(QUESTIONS.length).fill(null); start(); window.scrollTo(0,0); };
+  if(dr) dr.onclick=()=>{ try{sessionStorage.removeItem('cs_result');sessionStorage.removeItem('cs_pending');sessionStorage.removeItem('cs_waitlist');}catch(e){} answers=new Array(QUESTIONS.length).fill(null); start(); window.scrollTo(0,0); };
   window.scrollTo(0,0);
 }
 
@@ -449,7 +462,10 @@ function save(name,tg,r,ads){
   const ok=o=>o && o.s && PORTS.every(p=>typeof o.s[p.id]==='number') && (o.main==='full'||PORTS.some(p=>p.id===o.main));
   const get=k=>{ let v=null; try{ v=JSON.parse(sessionStorage.getItem(k)||'null'); }catch(e){} if(v && !ok(v)){ try{sessionStorage.removeItem(k);}catch(e){} v=null; } return v; };
   let saved=get('cs_result'), pending=get('cs_pending');
-  const done=new URLSearchParams(location.search).get('done')==='1';
+  const qs=new URLSearchParams(location.search);
+  const done=qs.get('done')==='1';
+  if(qs.get('waitlist')==='1'){ try{ sessionStorage.setItem('cs_waitlist','1'); }catch(e){}
+    if(!(saved && saved.s)){ app.innerHTML=`<div class="stack"><div class="product"><div class="eyebrow">${WAITLIST_DONE.eyebrow}</div><h3>${WAITLIST_DONE.title}</h3><p>${WAITLIST_DONE.text}</p><a class="btn" href="${CHANNEL_URL}" target="_blank" rel="noopener">${WAITLIST_DONE.cta}</a></div></div>`; return; } }
   if(done && pending && pending.s){
     try{ sessionStorage.setItem('cs_result',JSON.stringify(pending)); sessionStorage.removeItem('cs_pending'); }catch(e){}
     saved=pending;
