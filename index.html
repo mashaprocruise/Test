@@ -1,5 +1,10 @@
-<title>Круизный сканер турагента</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Что мешает тебе продавать круизы · тест для турагентов</title>
+<meta name="theme-color" content="#0b1630">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;800;900&display=swap">
@@ -26,7 +31,8 @@
 html,body{height:100%}
 body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.5;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.wrap{max-width:520px;margin:0 auto;padding-block:28px 56px}
+.wrap{max-width:520px;margin:0 auto;padding-block:28px 56px;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center}
+.wrap>.stack{width:100%}
 h1,h2,h3{text-wrap:balance;margin:0}
 .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800}
 .muted{color:var(--muted)}
@@ -109,7 +115,8 @@ input[type=text]{width:100%;font:inherit;color:var(--fg);background:var(--surfac
 @keyframes pulse{0%,100%{opacity:.9}50%{opacity:.35}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
-
+</head>
+<body>
 <div class="wrap" id="app"></div>
 
 <script>
@@ -478,3 +485,5 @@ function lastStepFrom(r){ // вернулась с формы без отпра�
   const saveScore=score; score=()=>r; lastStep(); score=saveScore;
 }
 </script>
+</body>
+</html>
