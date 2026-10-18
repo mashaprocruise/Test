@@ -110,6 +110,8 @@ input[type=text]{width:100%;font:inherit;color:var(--fg);background:var(--surfac
 .product h3{font-size:22px;font-weight:900;margin:6px 0 10px}
 .product .eyebrow{color:#ffd9de}
 .product p{margin:0 0 16px}
+.yf{width:100%;height:620px;border:0;border-radius:16px;background:#fff;display:block}
+.yf-note{font-size:13px;color:var(--muted);text-align:center;margin:0}
 .foot{font-size:13px;color:var(--muted);text-align:center;margin:0}
 .shoal-ring{transform-box:fill-box;transform-origin:center;animation:pulse 2.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.9}50%{opacity:.35}}
@@ -294,19 +296,45 @@ function lastStep(){
   const scores=PORTS.map(p=>`${p.name} ${r.s[p.id].toFixed(1)}`).join(' · ');
   const q=new URLSearchParams({result:RESULTS[r.main].title, scores, answers:answers.join(''), attempt:String(n),
     src:new URLSearchParams(location.search).get('src')||''});
+  q.set('iframe','1');
   const href=YANDEX_FORM_URL+(YANDEX_FORM_URL.includes('?')?'&':'?')+q.toString();
+  try{ localStorage.setItem('cs_attempts',n);}catch(e){}
   app.innerHTML = `
   <div class="stack">
     <div class="progress"><i style="width:100%"></i></div>
     <div class="eyebrow">Последний шаг</div>
     <h2 class="q">Оставь имя и Telegram, и сразу увидишь свой результат</h2>
-    <p class="muted" style="margin:0">Откроется короткая форма из двух полей. После отправки ты вернёшься сюда, к своему результату.</p>
-    <a class="btn" id="toForm" href="${href}">Перейти к форме</a>
+    <iframe class="yf" id="yf" src="${href}" title="Имя и Telegram"></iframe>
     <button class="back" id="back">← Назад</button>
   </div>`;
-  document.getElementById('toForm').onclick=()=>{ try{ localStorage.setItem('cs_attempts',n);}catch(e){} };
+  watchSubmit(document.getElementById('yf'), formDone);
   document.getElementById('back').onclick=()=>{idx=QUESTIONS.length-1;question();};
   window.scrollTo(0,0);
+}
+
+// Отслеживаем отправку Яндекс Формы внутри страницы
+function watchSubmit(frame, cb){
+  let loads=0, ready=false, fired=false;
+  const fire=()=>{ if(fired) return; fired=true; window.removeEventListener('message',onMsg); cb(); };
+  frame.addEventListener('load',()=>{ loads++; if(loads>1) fire(); });
+  function onMsg(e){
+    if(e.source!==frame.contentWindow) return;
+    const d=typeof e.data==='string'?e.data:JSON.stringify(e.data||'');
+    if(!ready){ if(/survey-iframe|ping/.test(d)) ready=true; return; }
+    if(/unloading|sent|success|submit|thank/i.test(d)) fire();
+  }
+  window.addEventListener('message',onMsg);
+}
+function formDone(){
+  let pending=null; try{ pending=JSON.parse(sessionStorage.getItem('cs_pending')||'null'); }catch(e){}
+  if(!pending) return;
+  try{ sessionStorage.setItem('cs_result',JSON.stringify(pending)); sessionStorage.removeItem('cs_pending'); }catch(e){}
+  result(pending);
+}
+function waitlistDone(){
+  try{ sessionStorage.setItem('cs_waitlist','1'); }catch(e){}
+  let saved=null; try{ saved=JSON.parse(sessionStorage.getItem('cs_result')||'null'); }catch(e){}
+  if(saved){ result(saved); const el=document.querySelector('.product'); el&&el.scrollIntoView({block:'center'}); }
 }
 
 function contact(){
@@ -415,7 +443,7 @@ function result(r){
   const R=RESULTS[r.main];
   let waited=false; try{ waited=sessionStorage.getItem('cs_waitlist')==='1'; }catch(e){}
   let P=PRODUCTS[R.product];
-  if(R.product==='nb') P = waited ? WAITLIST_DONE : {...P, href:waitlistHref(r)};
+  if(R.product==='nb') P = waited ? WAITLIST_DONE : {...P, href:'#', inline:waitlistHref(r)+'&iframe=1'};
   const shoal = r.main==='full'?null:portOf(r.main);
   app.innerHTML = `
   <div class="stack">
@@ -446,12 +474,16 @@ function result(r){
       <div class="eyebrow">${P.eyebrow}</div>
       <h3>${P.title}</h3>
       <p>${P.text}</p>
-      <a class="btn" href="${P.href}"${P.href.startsWith('https://t.me')?' target="_blank" rel="noopener"':''}>${P.cta}</a>
+      <div id="pAct">${P.inline?`<button class="btn" id="wlBtn">${P.cta}</button>`:`<a class="btn" href="${P.href}" target="_blank" rel="noopener">${P.cta}</a>`}</div>
     </div>
 
     <p class="foot">Главная проблема определяется по порядку блоков: это первый блок с баллом ниже 5. Следующие блоки подождут, пока не решишь эту.</p>
     ${DEMO?'<button class="back" id="demoReset" style="align-self:center">Демо: пройти заново</button>':''}
   </div>`;
+  const wb=document.getElementById('wlBtn');
+  if(wb) wb.onclick=()=>{ const box=document.getElementById('pAct');
+    box.innerHTML=`<iframe class="yf" id="wlf" src="${P.inline}" title="Лист ожидания" style="height:600px"></iframe>`;
+    watchSubmit(document.getElementById('wlf'), waitlistDone); };
   const dr=document.getElementById('demoReset');
   if(dr) dr.onclick=()=>{ try{sessionStorage.removeItem('cs_result');sessionStorage.removeItem('cs_pending');sessionStorage.removeItem('cs_waitlist');}catch(e){} answers=new Array(QUESTIONS.length).fill(null); start(); window.scrollTo(0,0); };
   window.scrollTo(0,0);
@@ -470,6 +502,10 @@ function save(name,tg,r,ads){
   const get=k=>{ let v=null; try{ v=JSON.parse(sessionStorage.getItem(k)||'null'); }catch(e){} if(v && !ok(v)){ try{sessionStorage.removeItem(k);}catch(e){} v=null; } return v; };
   let saved=get('cs_result'), pending=get('cs_pending');
   const qs=new URLSearchParams(location.search);
+  if(window.parent!==window){ try{
+    if(qs.get('done')==='1' && window.parent.formDone){ window.parent.formDone(); return; }
+    if(qs.get('waitlist')==='1' && window.parent.waitlistDone){ window.parent.waitlistDone(); return; }
+  }catch(e){} }
   const done=qs.get('done')==='1';
   if(qs.get('waitlist')==='1'){ try{ sessionStorage.setItem('cs_waitlist','1'); }catch(e){}
     if(!(saved && saved.s)){ app.innerHTML=`<div class="stack"><div class="product"><div class="eyebrow">${WAITLIST_DONE.eyebrow}</div><h3>${WAITLIST_DONE.title}</h3><p>${WAITLIST_DONE.text}</p><a class="btn" href="${CHANNEL_URL}" target="_blank" rel="noopener">${WAITLIST_DONE.cta}</a></div></div>`; return; } }
